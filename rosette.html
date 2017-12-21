@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>CS 4280: Frankie (Liz) Ruttenbur Assignment 1</title>
+  <style>canvas { border: 1px solid red; }</style> <!--the border-->
+</head>
+
+<body>
+  <canvas id="webgl-scene" width="1000" height="800">
+    Your browser does not support HTML5.
+  </canvas>
+
+ <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+ <script src="webgl_helper.js"></script>
+
+ <!-- Vertex Shader -->
+ <script id='shader-vs' type='x-shader/x-vertex'>
+  attribute vec3 coordinates;
+
+  void main(void) {
+    //coordinates for the rosette
+    gl_Position = vec4(coordinates, 1.0); //contains the xyz coordinates
+    gl_PointSize = 2.0;
+
+  }
+
+ </script>
+ <!-- Fragment Shader -->
+ <script id='shader-fs' type='x-shader/x-fragment'>
+  void main(void) {
+    gl_FragColor = vec4(0.6, 0.2, 0.5, 1.0); //the color
+  }
+ </script>
+
+<script>
+
+  $(document).ready(function(){
+
+    var canvas = $("#webgl-scene")[0];
+    var gl = initWebGL(canvas);
+    var program = initShaders(gl, $("#shader-vs").text(), $("#shader-fs").text()); //passes in the shaders
+    gl.useProgram(program); //uses the program
+
+    var n = 25; //sets the vertices limit
+    var vertices = [] //the vertex array
+    var lines = []; //the array for the lines that make the rosette the rosette
+
+    /*the MATH*/
+    var theta = 2* Math.PI/ n; //this is for the math for the circle
+
+    for(var i = 0; i < n; i++){
+        vertices.push([Math.cos(i * theta), Math.sin(i * theta)]); //pushes the angles into the vertices array
+      }
+
+    for(var i = 0; i < n; i++){
+      for(var j = i + 1; j < n; j++){
+          lines.push(vertices[i][0], vertices[i][1], 0.0); //passes in the point values to the lines array
+          lines.push(vertices[j][0], vertices[j][1], 0.0); //passes in the pont values to the lines array
+        }
+      }
+
+    initBuffers(gl, program, [
+      {
+        name: "coordinates",
+        size: 3,
+        data: lines //tells that the lines are the data that is used
+      }
+    ]);
+
+  clear(gl, [1.0, 1.0, 1.0, 1.0]);
+  gl.drawArrays(gl.LINES, 0, lines.length/3); //tells you to pass in however big the lines array is / 3
+
+});
+
+</script>
+</body>
+</html>

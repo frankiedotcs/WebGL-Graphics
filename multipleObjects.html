@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>CS 4280: Computer Graphics</title>
+	<style>
+		canvas {
+			border: 1px solid red;
+		}
+	</style>
+</head>
+
+<body>
+	<canvas id="webgl-scene" width="600" height="600">
+		Your browser does not support HTML5.
+	</canvas>
+
+	<script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.4.0/gl-matrix-min.js"></script>
+	<script src="webgl_helper.js"></script>
+
+	<!-- Vertex Shader -->
+	<script id='shader-vs' type='x-shader/x-vertex'>
+		attribute vec3 coordinates;
+		attribute vec3 colors;
+		varying vec4 vColor;
+		uniform mat4 transformedBy;
+		void main(void) {
+			gl_Position = transformedBy * vec4(coordinates, 1.0);
+			vColor = vec4(colors, 1.0);
+			gl_PointSize = 2.0;
+		}
+	</script>
+	<!-- Fragment Shader -->
+	<script id='shader-fs' type='x-shader/x-fragment'>
+		varying mediump vec4 vColor;
+		void main(void) {
+		  gl_FragColor = vColor;
+		}
+	</script>
+
+	<script>
+		$(document).ready(function () {
+			var canvas = $("#webgl-scene")[0];
+      var gl = initWebGL(canvas);
+      var theta = 0.0;
+      var program = initShaders(gl, $("#shader-vs").text(), $("#shader-fs").text());
+      gl.useProgram(program);
+      var thetaLoc = gl.getUniformLocation(program, "theta");
+			//the shape variable so we don't have to get confused on which program is using what
+			var shape = [];
+
+			function face(indices, a, b, c, d) {
+				indices.push(a, b, c);
+				indices.push(a, c, d);
+			}//indices helper for the parallellpipes
+
+			//PARALELLEPIPED METHOD
+			function parallelepiped() {
+				var vertices = [
+					-0.5, -0.5,  0.5,
+					 0.5, -0.5,  0.5,
+					 0.5,  0.5,  0.5,
+					-0.5,  0.5,  0.5,
+					-0.5, -0.5, -0.5,
+					 0.5, -0.5, -0.5,
+					 0.5,  0.5, -0.5,
+					-0.5,  0.5, -0.5];
+				var indices = [];
+				var colors = [
+					[1.0, 0.0, 1.0],
+					[1.0, 1.0, 0.0],
+					[0.0, 1.0, 1.0],
+					[1.0, 0.0, 0.0],
+					[0.0, 1.0, 0.0],
+					[0.0, 0.0, 1.0]];
+
+				face(indices, 0, 1, 2, 3); // front
+				face(indices, 4, 5, 6, 7); // back
+				face(indices, 1, 5, 4, 0); // botton
+				face(indices, 2, 6, 7, 3); // top
+				face(indices, 1, 5, 6, 2); // right
+				face(indices, 0, 4, 7, 3); // left
+
+				var v_out = [];
+				indices.forEach(function (i) {
+					v_out.push(vertices[3 * i], vertices[3 * i + 1], vertices[3 * i + 2])
+				});
+				//the colors!
+				var c_out = []
+				colors.forEach(function (color) {
+					for (var i = 1; i <= 6; i++) {
+						c_out.push(color[0], color[1], color[2]);
+					}
+				});
+
+				return { vertices: v_out, indices: indices, colors: c_out }; //returns the data
+			};
+
+				var parallelepiped = parallelepiped();
+
+				//INIT BUFFERS
+				var parallelepiped_buffers =  initBuffers(gl, program, [{
+					name: "coordinates",
+					size: 3,
+					data: parallelepiped.vertices
+				}, {
+					name: "colors",
+					size: 3,
+					data: parallelepiped.colors
+				}
+			  ]);
+
+
+				shape.push({model: parallelepiped, buffer: parallelepiped_buffers});
+			//SPHERE METHOD
+			function sphere() {
+
+				var circlePoints = 30; //points on the sphere
+				var r = .5;
+				var v_out = [];
+				var c_out = [];
+
+				//the math for the sphere
+
+				for (var i = 0; i <= circlePoints; i++) {
+					var theta = i * Math.PI / circlePoints; //calculates the changing theta
+					for (var j = 0; j <= circlePoints; j++) {
+						var phi = j * 2 * Math.PI / circlePoints;
+						v_out.push(r * Math.cos(phi) * Math.sin(theta), r * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta));
+						c_out.push(1, 0, 0);
+					}
+				}
+
+				return { vertices: v_out, colors: c_out };
+			};
+
+				var sphere = sphere();
+
+				//INIT BUFFERS
+		 var sphere_buffers = initBuffers(gl, program, [{
+					name: "coordinates",
+					size: 3,
+					data: sphere.vertices
+				},{
+					name: "colors",
+					size: 3,
+					data: sphere.colors
+				  }
+			]);
+
+			shape.push({model: sphere, buffer: sphere_buffers});
+
+
+			//THE CONE METHOD
+			function cone() {
+				var pi2 = 2 * Math.PI; // Pi * 2
+				var height = 1;
+				var offsetY = -height/2;
+				var radius = .5;
+				var circlePoints = 40;
+				var c_out = [1, 0, 1]; //sets the original point color
+				var vertices = [0.0, 0.0, 0.0]; //the point at the top of the cone
+
+				for (var i = 0; i <= circlePoints; i++) {
+							var y = offsetY - height;
+							var x = radius * Math.cos(i/circlePoints * pi2);
+							var z = radius * Math.sin(i/circlePoints * pi2);
+							vertices.push(x, y, z);
+							c_out.push(1, 0, 1);
+					}
+
+				return { vertices: vertices, colors: c_out };
+			};
+			var cone = cone();
+
+				//INIT BUFFERS
+			var cone_buffers = initBuffers(gl, program, [{
+					name: "coordinates",
+					size: 3,
+					data: cone.vertices,
+				},{
+					name: "colors",
+					size: 3,
+					data: cone.colors
+				  }
+				]);
+
+			shape.push({model: cone, buffer: cone_buffers});
+			//CYLINDER METHOD
+			function cylinder(){
+				var v_out = [];
+				var pi2 = 2 * Math.PI; // Pi times 2
+				var circlePoints = 200;
+				var theta = pi2 / circlePoints; // 2PI divided by the circlePoints
+				var radius = .5; //radius
+				var height = 1;
+				var c_out = []; //colors array
+				var offsetY = -height/2;
+
+				//for the bottom top of the cylinder
+				for(var i=0; i<=circlePoints; i++) {
+						var y = offsetY;
+						var x = radius * Math.cos(i/circlePoints * Math.PI * 2);
+						var z = radius * Math.sin(i/circlePoints * Math.PI * 2);
+						v_out.push(x, y, z);
+						c_out.push(1, 1, 0);
+				}
+
+				//for the top of the cylinder
+				for(var i=0; i<=circlePoints; i++) {
+						var y = offsetY + height;
+						var x = radius * Math.cos(i/circlePoints * Math.PI * 2);
+						var z = radius * Math.sin(i/circlePoints * Math.PI * 2);
+						v_out.push(x, y, z);
+
+						c_out.push(1, 1, 0);
+				}
+
+				//the cylinder around the sides
+				for(var j=0; j<=circlePoints; j++) {
+				    for(var i=0; i<=8; i++) {
+				      var r = radius + (radius - radius) * j/circlePoints;
+				      var y = offsetY + height * j/circlePoints;
+				      var x = radius * Math.cos(i/8 * Math.PI * 2);
+				      var z = radius * Math.sin(i/8 * Math.PI * 2);
+							v_out.push(x, y, z,);
+							c_out.push(1, 1, 0);
+
+						}
+					}
+				return { vertices: v_out, colors: c_out };
+			};
+
+				var cylinder = cylinder();
+
+				//INIT BUFFER
+			var cylinder_buffers = initBuffers(gl, program, [{
+					name: "coordinates",
+					size: 3,
+					data: cylinder.vertices,
+				},{
+					name: "colors",
+					size: 3,
+					data: cylinder.colors
+				  }
+			]);
+
+			shape.push({model: cylinder, buffer: cylinder_buffers});
+			var transformedByLoc = gl.getUniformLocation(program, "transformedBy");
+			var theta = [0, 0, 0, 0, 0];
+			var program_Count = 5;
+
+			//INSTANTIATION METHOD
+			function instantiate(i, thetaIncrement, axis, scaleBy, translateTo){
+
+				var item = shape[i]; //the item that will be made with the shape array
+
+				//BUFFER STUFFS
+				gl.bindBuffer(gl.ARRAY_BUFFER, item.buffer.coordinates); //bind buffers
+				var attribute = gl.getAttribLocation(program, "coordinates");
+				gl.vertexAttribPointer(attribute, 3, gl.FLOAT, false, 0, 0); //points to the vertex attribute
+				gl.enableVertexAttribArray(attribute);//points to the coordinates for the program
+
+				gl.bindBuffer(gl.ARRAY_BUFFER, item.buffer.colors); //bind buffers
+				var attribute = gl.getAttribLocation(program, "colors");
+				gl.vertexAttribPointer(attribute, 3, gl.FLOAT, false, 0, 0); //points to the vertex attribute
+				gl.enableVertexAttribArray(attribute);//points to the coordinates for the program
+
+				var length = item.model.vertices.length; //determines the length of each shapes
+				console.log(length);
+				//transformation translation station
+				theta[i] += thetaIncrement;
+				var r = mat4.fromRotation(mat4.create(), theta[i], axis); //rotation
+				var s = mat4.fromScaling(mat4.create(), scaleBy); //scaling
+				var t = mat4.fromTranslation(mat4.create(), translateTo); //translation
+				var m = mat4.mul(mat4.create(), t, mat4.mul(mat4.create(), r, s)); //put it together
+				gl.uniformMatrix4fv(transformedByLoc, false, m);
+
+				//RENDERING
+				if(i == 0){
+					gl.drawArrays(gl.TRIANGLES, 0, 36); //the parallelepiped
+				}
+				else if( i == 1){
+					gl.drawArrays(gl.POINTS, 0, length/3);  //the sphere cause POINTS ARE COOL
+				}
+				else if( i == 2){ //for the cone
+					gl.drawArrays(gl.TRIANGLE_FAN, 0, length/3);
+
+				}
+				else{//for the cylinder
+					gl.drawArrays(gl.TRIANGLE_FAN, 0,  length/3);
+
+
+				}//end sw
+
+			  }
+
+			clear(gl, [1.0, 1.0, 1.0, 1.0]);
+
+			//ANIMATION
+			var animate = function (time) {
+				//i, thetaIncrement, axis, scaleBy, translateTo
+				instantiate(0, -0.03, [.1, .3, -.2], [.3, .3, .5], [ .7, 0, 0 ]); //instantiates the parallelepiped
+				instantiate(1,  0.05, [.6, .4, -.3], [.3, .3, .3], [ .6, .5, .4]); //instantiates the sphere
+				instantiate(2,  0.06, [1, 1, -1], [.5, .2, .5], [-.5, .8, -.5]); //instantiates the cone
+				instantiate(3,  0.01, [ 1, -1, -1], [.5, .5, .6], [ -.5, -.7, -.7]); //instantiates the cylinder
+
+				window.requestAnimationFrame(animate); //animates
+			 };
+
+			 animate(0);
+
+})
+</script>
+</body>
+</html>
